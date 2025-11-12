@@ -10,7 +10,7 @@ CORS(app)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# ✅ Load model and scaler from backend folder
+# Load model and scaler
 model = joblib.load(os.path.join(BASE_DIR, "student_performance_model.pkl"))
 scaler = joblib.load(os.path.join(BASE_DIR, "scaler.pkl"))
 
@@ -18,7 +18,7 @@ scaler = joblib.load(os.path.join(BASE_DIR, "scaler.pkl"))
 def home():
     return "🎓 EduTrack ML API is running!"
 
-# ✅ Single student prediction
+# Single student prediction
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
@@ -30,7 +30,7 @@ def predict():
     except Exception as e:
         return jsonify({'error': str(e)})
 
-# ✅ CSV upload + bulk prediction
+# CSV upload + bulk prediction
 @app.route('/predict_csv', methods=['POST'])
 def predict_csv():
     try:
@@ -42,7 +42,7 @@ def predict_csv():
             return jsonify({"error": "Only CSV files are allowed"}), 400
 
         # Save temporarily
-        upload_folder = "uploads"
+        upload_folder = os.path.join(BASE_DIR, "uploads")
         os.makedirs(upload_folder, exist_ok=True)
         filepath = os.path.join(upload_folder, "uploaded.csv")
         file.save(filepath)
@@ -50,7 +50,7 @@ def predict_csv():
         # Read file
         df = pd.read_csv(filepath)
 
-        # Check for required columns
+        # Required columns
         required_columns = [
             'Age', 'Gender', 'Ethnicity', 'ParentalEducation', 'StudyTimeWeekly',
             'Absences', 'Tutoring', 'ParentalSupport', 'Extracurricular',
@@ -69,24 +69,27 @@ def predict_csv():
         df['Predicted_GradeClass'] = predictions
 
         # Save results
-        output_folder = "outputs"
+        output_folder = os.path.join(BASE_DIR, "outputs")
         os.makedirs(output_folder, exist_ok=True)
         output_path = os.path.join(output_folder, "predicted_output.csv")
         df.to_csv(output_path, index=False)
 
+        # Create download URL dynamically
+        download_url = request.url_root.rstrip("/") + "/download/predicted_output.csv"
+
         return jsonify({
             "message": "✅ Predictions generated successfully!",
-            "download_url": f"http://127.0.0.1:5000/download/predicted_output.csv"
+            "download_url": download_url
         })
     
     except Exception as e:
         return jsonify({"error": str(e)})
 
-# ✅ Download predicted file
+# Download predicted CSV
 @app.route("/download/<path:filename>", methods=["GET"])
 def download_file(filename):
     try:
-        output_path = os.path.join("outputs", filename)
+        output_path = os.path.join(BASE_DIR, "outputs", filename)
         if not os.path.exists(output_path):
             return jsonify({"error": "File not found"}), 404
         return send_file(output_path, as_attachment=True)
@@ -94,4 +97,4 @@ def download_file(filename):
         return jsonify({"error": str(e)})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
